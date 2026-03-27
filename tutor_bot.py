@@ -14,12 +14,12 @@ class UltimateCycleBot:
         self.solved_count = 0
         self.user_level = 1
         self.history = []
-        
+
         # База знаний для анализа
         self.patterns = self._build_patterns()
         self.templates = self._build_templates()
         self.algorithms = self._build_algorithms()
-        
+
     def _build_patterns(self) -> Dict:
         """Строит паттерны для распознавания задач"""
         return {
@@ -54,7 +54,7 @@ class UltimateCycleBot:
                 r"кратн[ыу][ех]?\s+(\d+)\s+числа?\s+(от\s+)?(\d+)\s+(до|по)\s+(\d+)",
                 r"числа[,\s]+кратные\s+(\d+)",
             ],
-            
+
             # Алгоритмические задачи
             "factorial": [
                 r"факториал\s+числа?\s+(\d+)",
@@ -82,7 +82,7 @@ class UltimateCycleBot:
                 r"палиндром[ы]?\s+(до\s+)?(\d+)",
                 r"palindrome\s+numbers",
             ],
-            
+
             # Списки и массивы
             "list_find": [
                 r"найди\s+(\d+)\s+в\s+списк[еа]\s+\[(.*?)\]",
@@ -113,7 +113,7 @@ class UltimateCycleBot:
                 r"переверн[иу]?\s+список\s+\[(.*?)\]",
                 r"обратн[ыу][йе]?\s+порядок",
             ],
-            
+
             # Матрицы и вложенные циклы
             "matrix_create": [
                 r"создай\s+матриц[уа]\s+(\d+)х(\d+)",
@@ -131,7 +131,7 @@ class UltimateCycleBot:
                 r"ромб\s+(высот[аой]\s+)?(\d+)",
                 r"diamond",
             ],
-            
+
             # Сложные алгоритмы
             "gcd": [
                 r"нод\s+чисел?\s+(\d+)\s+и\s+(\d+)",
@@ -157,7 +157,7 @@ class UltimateCycleBot:
                 r"сортировк[ау]\s+слияни[еем]",
                 r"merge\s+sort",
             ],
-            
+
             # Работа со строками
             "string_reverse": [
                 r"переверн[иу]?\s+строк[уа]\s+[\"'](.*?)[\"']",
@@ -175,7 +175,7 @@ class UltimateCycleBot:
                 r"шифр\s+цезар[я]\s+(со\s+)?сдвиг[оа]м?\s+(\d+)",
                 r"caesar\s+cipher",
             ],
-            
+
             # Математические ряды
             "arithmetic_progression": [
                 r"арифметическ[ая][я]\s+прогресси[яю]\s+(\d+)\s+(\d+)\s+(\d+)",
@@ -185,7 +185,7 @@ class UltimateCycleBot:
                 r"геометрическ[ая][я]\s+прогресси[яю]\s+(\d+)\s+(\d+)\s+(\d+)",
                 r"геом\.\s+прогрессия",
             ],
-            
+
             # Циклы while
             "while_until": [
                 r"пока\s+(\w+)\s+(\<|\>|\<=|\>=|\==)\s+(\d+)",
@@ -195,11 +195,11 @@ class UltimateCycleBot:
                 r"бесконечн[ыу][йе]\s+цикл",
                 r"while\s+true",
             ],
-            
+
             # По умолчанию
             "unknown": [],
         }
-    
+
     def _build_templates(self) -> Dict:
         """Шаблоны генерации кода"""
         return {
@@ -241,7 +241,7 @@ class UltimateCycleBot:
             "while_until": self._gen_while_until,
             "infinite_loop": self._gen_infinite_loop,
         }
-    
+
     def _build_algorithms(self) -> Dict:
         """Сложные алгоритмы для вставки"""
         return {
@@ -254,7 +254,7 @@ class UltimateCycleBot:
             for multiple in range(p * p, n + 1, p):
                 sieve[multiple] = False
     return [num for num in range(2, n + 1) if sieve[num]]""",
-            
+
             "binary_search": """def binary_search(arr, target):
     \"\"\"Двоичный поиск в отсортированном массиве\"\"\"
     left, right = 0, len(arr) - 1
@@ -267,7 +267,7 @@ class UltimateCycleBot:
         else:
             right = mid - 1
     return -1""",
-            
+
             "bubble_sort": """def bubble_sort(arr):
     \"\"\"Сортировка пузырьком\"\"\"
     n = len(arr)
@@ -280,7 +280,7 @@ class UltimateCycleBot:
         if not swapped:
             break
     return arr""",
-            
+
             "quick_sort": """def quick_sort(arr):
     \"\"\"Быстрая сортировка\"\"\"
     if len(arr) <= 1:
@@ -290,7 +290,7 @@ class UltimateCycleBot:
     middle = [x for x in arr if x == pivot]
     right = [x for x in arr if x > pivot]
     return quick_sort(left) + middle + quick_sort(right)""",
-            
+
             "merge_sort": """def merge_sort(arr):
     \"\"\"Сортировка слиянием\"\"\"
     if len(arr) <= 1:
@@ -314,22 +314,22 @@ def merge(left, right):
     result.extend(right[j:])
     return result""",
         }
-    
+
     def solve(self, task: str) -> str:
         """Главный метод решения"""
         self.history.append(task)
         task_lower = task.lower()
-        
+
         # Определяем тип задачи
         task_type = self._identify_task(task_lower)
-        
+
         # Генерируем решение
         if task_type in self.templates:
             return self.templates[task_type](task)
-        
+
         # Если не распознали - умный парсер
         return self._smart_solve(task)
-    
+
     def _identify_task(self, task: str) -> str:
         """Определяет тип задачи по паттернам"""
         for task_type, patterns in self.patterns.items():
@@ -337,11 +337,11 @@ def merge(left, right):
                 if re.search(pattern, task, re.IGNORECASE):
                     return task_type
         return "unknown"
-    
+
     def _extract_numbers(self, task: str) -> List[int]:
         """Извлекает все числа из строки"""
         return [int(x) for x in re.findall(r'\d+', task)]
-    
+
     def _extract_list(self, task: str) -> List:
         """Извлекает список из строки"""
         match = re.search(r'\[(.*?)\]', task)
@@ -358,15 +358,16 @@ def merge(left, right):
                     result.append(item.strip(' "\''))
             return result
         return []
-    
+
     def _extract_string(self, task: str) -> str:
         """Извлекает строку в кавычках"""
         match = re.search(r'["\'](.*?)["\']', task)
         return match.group(1) if match else ""
-    
+
     def _format_response(self, task: str, code: str, explanation: str, complexity: str = "средняя") -> str:
         """Форматирует ответ"""
         self.solved_count += 1
+        task_type = self._identify_task(task.lower())
         return f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  🧠 ULTIMATE CYCLE BOT v{self.version} — РЕШЕНИЕ ЗАДАЧИ #{self.solved_count}                    ║
@@ -375,7 +376,7 @@ def merge(left, right):
 📌 ЗАДАНИЕ:
 {task}
 
-🎯 ТИП ЗАДАЧИ: {self._identify_task(task.lower())}
+🎯 ТИП ЗАДАЧИ: {task_type}
 ⚡ СЛОЖНОСТЬ: {complexity}
 
 💡 ОБЪЯСНЕНИЕ АЛГОРИТМА:
