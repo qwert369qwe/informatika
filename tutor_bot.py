@@ -369,20 +369,15 @@ def merge(left, right):
         self.solved_count += 1
         task_type = self._identify_task(task.lower())
         return f"""
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  🧠 ULTIMATE CYCLE BOT v{self.version} — РЕШЕНИЕ ЗАДАЧИ #{self.solved_count}                    ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
 📌 ЗАДАНИЕ:
 {task}
 
-🎯 ТИП ЗАДАЧИ: {task_type}
+🎯 ТИП: {task_type}
 ⚡ СЛОЖНОСТЬ: {complexity}
 
 💡 ОБЪЯСНЕНИЕ:
 {explanation}
 
 📝 КОД:
-```python
 {code}
-```"""
+"""
