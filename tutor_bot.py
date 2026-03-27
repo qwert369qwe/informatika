@@ -379,9 +379,10 @@ def merge(left, right):
 🎯 ТИП ЗАДАЧИ: {task_type}
 ⚡ СЛОЖНОСТЬ: {complexity}
 
-💡 ОБЪЯСНЕНИЕ АЛГОРИТМА:
+💡 ОБЪЯСНЕНИЕ:
 {explanation}
 
-📝 ГЕНЕРИРОВАННЫЙ КОД:
+📝 КОД:
 ```python
 {code}
+```"""
