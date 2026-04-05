@@ -1,222 +1,352 @@
 import random
 import math
-import re
 
-class CycleTaskSolver:
-    def __init__(self):
-        # Нейросеть: 20 признаков задачи -> 10 нейронов -> 5 действий
-        self.w1 = [[random.uniform(-1, 1) for _ in range(10)] for _ in range(20)]
-        self.w2 = [[random.uniform(-1, 1) for _ in range(5)] for _ in range(10)]
-        self.b1 = [random.uniform(-1, 1) for _ in range(10)]
-        self.b2 = [random.uniform(-1, 1) for _ in range(5)]
+# ==================== ФУНКЦИИ АКТИВАЦИИ ====================
+def sigmoid(x):
+    """Сигмоидная функция активации"""
+    return 1 / (1 + math.exp(-x))
+
+def sigmoid_derivative(x):
+    """Производная сигмоиды для обратного распространения"""
+    return x * (1 - x)
+
+def relu(x):
+    """ReLU функция активации (альтернатива)"""
+    return max(0, x)
+
+# ==================== НЕЙРОСЕТЬ ДЛЯ XOR ====================
+class NeuralNetworkXOR:
+    def __init__(self, hidden_neurons=4, learning_rate=0.8):
+        """
+        Инициализация нейросети
+        hidden_neurons: количество нейронов в скрытом слое
+        learning_rate: скорость обучения
+        """
+        self.lr = learning_rate
         
-    def sigmoid(self, x):
-        return 1 / (1 + math.exp(-x))
-    
-    def parse_task(self, task_text):
-        """Превращаем текст задачи в числовые признаки"""
-        features = []
+        # Веса от входного слоя (2 нейрона) к скрытому
+        self.w_input_hidden = []
+        for i in range(2):  # 2 входа
+            neuron_weights = []
+            for j in range(hidden_neurons):
+                neuron_weights.append(random.uniform(-0.5, 0.5))
+            self.w_input_hidden.append(neuron_weights)
         
-        # Признаки: наличие ключевых слов
-        keywords = ['for', 'while', 'range', 'сумму', 'произведение', 
-                   'массив', 'список', 'цикл', 'каждый', 'элемент',
-                   'вывести', 'найти', 'подсчитать', 'среднее', 'максимум',
-                   'минимум', 'условие', 'if', 'break', 'continue']
+        # Веса от скрытого слоя к выходному (1 нейрон)
+        self.w_hidden_output = []
+        for j in range(hidden_neurons):
+            self.w_hidden_output.append(random.uniform(-0.5, 0.5))
         
-        for kw in keywords:
-            features.append(1 if kw in task_text.lower() else 0)
+        # Смещения (bias)
+        self.bias_hidden = []
+        for j in range(hidden_neurons):
+            self.bias_hidden.append(random.uniform(-0.5, 0.5))
         
-        # Числовые признаки
-        numbers = re.findall(r'\d+', task_text)
-        features.append(len(numbers) / 10)  # количество чисел
-        features.append(len(task_text) / 200)  # длина задачи
+        self.bias_output = random.uniform(-0.5, 0.5)
         
-        # Добиваем до 20 признаков
-        while len(features) < 20:
-            features.append(0)
-            
-        return features
-    
-    def forward(self, features):
-        """Прямой проход по нейросети"""
+        # Для хранения промежуточных значений
+        self.hidden_outputs = []
+        self.output = 0
+        
+    def forward(self, x1, x2):
+        """
+        Прямой проход: вычисление предсказания
+        """
         # Скрытый слой
-        hidden = []
-        for j in range(10):
-            total = self.b1[j]
-            for i in range(20):
-                total += features[i] * self.w1[i][j]
-            hidden.append(self.sigmoid(total))
+        self.hidden_outputs = []
+        for j in range(len(self.bias_hidden)):
+            # Суммируем взвешенные входы + смещение
+            total = self.bias_hidden[j]
+            total += x1 * self.w_input_hidden[0][j]
+            total += x2 * self.w_input_hidden[1][j]
+            # Применяем функцию активации
+            self.hidden_outputs.append(sigmoid(total))
         
-        # Выходной слой (5 действий)
-        output = []
-        for k in range(5):
-            total = self.b2[k]
-            for j in range(10):
-                total += hidden[j] * self.w2[j][k]
-            output.append(self.sigmoid(total))
-            
-        return output
-    
-    def generate_solution(self, task_text):
-        """Генерируем решение задачи на основе выхода нейросети"""
-        features = self.parse_task(task_text)
-        output = self.forward(features)
+        # Выходной слой
+        total_output = self.bias_output
+        for j in range(len(self.hidden_outputs)):
+            total_output += self.hidden_outputs[j] * self.w_hidden_output[j]
+        self.output = sigmoid(total_output)
         
-        # Определяем тип задачи по выходу нейросети
-        task_type = output.index(max(output))
+        return self.output
+    
+    def train(self, training_data, epochs=20000, verbose=True):
+        """
+        Обучение нейросети
+        training_data: список пар ([x1, x2], target)
+        epochs: количество эпох обучения
+        verbose: выводить ли прогресс
+        """
+        for epoch in range(epochs):
+            total_error = 0
+            
+            # Перемешиваем данные для лучшего обучения
+            shuffled_data = training_data.copy()
+            random.shuffle(shuffled_data)
+            
+            for (x1, x2), target in shuffled_data:
+                # Прямой проход
+                prediction = self.forward(x1, x2)
+                
+                # Вычисляем ошибку
+                error = target - prediction
+                total_error += error ** 2
+                
+                # === ОБРАТНОЕ РАСПРОСТРАНЕНИЕ ОШИБКИ ===
+                
+                # Градиент для выходного слоя
+                d_output = error * sigmoid_derivative(prediction)
+                
+                # Градиенты для скрытого слоя
+                d_hidden = []
+                for j in range(len(self.hidden_outputs)):
+                    d = d_output * self.w_hidden_output[j] * sigmoid_derivative(self.hidden_outputs[j])
+                    d_hidden.append(d)
+                
+                # Обновляем веса от скрытого к выходному
+                for j in range(len(self.hidden_outputs)):
+                    self.w_hidden_output[j] += self.lr * d_output * self.hidden_outputs[j]
+                self.bias_output += self.lr * d_output
+                
+                # Обновляем веса от входного к скрытому
+                for i in range(2):  # 2 входа
+                    for j in range(len(self.hidden_outputs)):
+                        if i == 0:
+                            self.w_input_hidden[0][j] += self.lr * d_hidden[j] * x1
+                        else:
+                            self.w_input_hidden[1][j] += self.lr * d_hidden[j] * x2
+                
+                # Обновляем смещения скрытого слоя
+                for j in range(len(self.hidden_outputs)):
+                    self.bias_hidden[j] += self.lr * d_hidden[j]
+            
+            # Выводим прогресс
+            if verbose and (epoch % 2000 == 0 or epoch == epochs - 1):
+                avg_error = total_error / len(training_data)
+                print(f"Эпоха {epoch:5d}, Ошибка: {avg_error:.6f}")
+    
+    def predict(self, x1, x2):
+        """Предсказание (возвращает 0 или 1)"""
+        output = self.forward(x1, x2)
+        return 1 if output > 0.5 else 0
+    
+    def predict_proba(self, x1, x2):
+        """Предсказание с вероятностью"""
+        return self.forward(x1, x2)
+
+# ==================== УПРОЩЁННАЯ ВЕРСИЯ (для понимания) ====================
+def simple_xor_network():
+    """
+    Минимальная нейросеть для XOR (без классов)
+    """
+    print("\n" + "="*60)
+    print("УПРОЩЁННАЯ ВЕРСИЯ НЕЙРОСЕТИ")
+    print("="*60)
+    
+    # Инициализация весов
+    w11, w12 = random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)
+    w21, w22 = random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)
+    w31, w32 = random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)
+    b1, b2, b3 = random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)
+    lr = 0.8
+    
+    data = [([0,0], 0), ([0,1], 1), ([1,0], 1), ([1,1], 0)]
+    
+    print("\nОбучение упрощённой сети...")
+    for epoch in range(15000):
+        total_err = 0
+        for (x1, x2), target in data:
+            # Прямой проход
+            h1 = sigmoid(x1*w11 + x2*w21 + b1)
+            h2 = sigmoid(x1*w12 + x2*w22 + b2)
+            out = sigmoid(h1*w31 + h2*w32 + b3)
+            
+            err = target - out
+            total_err += err**2
+            
+            # Обратное распространение
+            d_out = err * sigmoid_derivative(out)
+            d_h1 = d_out * w31 * sigmoid_derivative(h1)
+            d_h2 = d_out * w32 * sigmoid_derivative(h2)
+            
+            # Обновление весов
+            w31 += lr * d_out * h1
+            w32 += lr * d_out * h2
+            b3 += lr * d_out
+            
+            w11 += lr * d_h1 * x1
+            w21 += lr * d_h1 * x2
+            b1 += lr * d_h1
+            
+            w12 += lr * d_h2 * x1
+            w22 += lr * d_h2 * x2
+            b2 += lr * d_h2
         
-        solutions = {
-            0: self.solve_sum_task,
-            1: self.solve_count_task,
-            2: self.solve_max_min_task,
-            3: self.solve_pattern_task,
-            4: self.solve_filter_task
-        }
+        if epoch % 3000 == 0:
+            print(f"Эпоха {epoch:5d}, Ошибка: {total_err/4:.6f}")
+    
+    # Результаты
+    print("\nРЕЗУЛЬТАТЫ УПРОЩЁННОЙ СЕТИ:")
+    correct = 0
+    for (x1, x2), target in data:
+        h1 = sigmoid(x1*w11 + x2*w21 + b1)
+        h2 = sigmoid(x1*w12 + x2*w22 + b2)
+        out = sigmoid(h1*w31 + h2*w32 + b3)
+        pred = 1 if out > 0.5 else 0
+        correct += (pred == target)
+        status = "✅" if pred == target else "❌"
+        print(f"{status} {x1} XOR {x2} = {pred}  (вероятность: {out:.4f}, должно: {target})")
+    
+    print(f"\nТочность: {correct}/4 ({correct*25}%)")
+
+# ==================== РАСШИРЕННАЯ ВЕРСИЯ С ТЕСТИРОВАНИЕМ ====================
+def extended_test():
+    """
+    Тестирование нейросети на разных конфигурациях
+    """
+    print("\n" + "="*60)
+    print("РАСШИРЕННОЕ ТЕСТИРОВАНИЕ")
+    print("="*60)
+    
+    # Данные для XOR
+    xor_data = [([0,0], 0), ([0,1], 1), ([1,0], 1), ([1,1], 0)]
+    
+    # Пробуем разное количество нейронов
+    configs = [
+        {"neurons": 2, "lr": 0.7, "epochs": 15000, "name": "2 нейрона"},
+        {"neurons": 4, "lr": 0.8, "epochs": 15000, "name": "4 нейрона"},
+        {"neurons": 6, "lr": 0.9, "epochs": 12000, "name": "6 нейронов"}
+    ]
+    
+    best_accuracy = 0
+    best_network = None
+    
+    for config in configs:
+        print(f"\n--- {config['name']} ---")
+        nn = NeuralNetworkXOR(
+            hidden_neurons=config["neurons"],
+            learning_rate=config["lr"]
+        )
+        nn.train(xor_data, epochs=config["epochs"], verbose=False)
         
-        return solutions.get(task_type, self.solve_generic)(task_text)
+        # Проверяем
+        correct = 0
+        for (x1, x2), target in xor_data:
+            pred = nn.predict(x1, x2)
+            if pred == target:
+                correct += 1
+        
+        accuracy = correct / 4 * 100
+        print(f"Точность: {correct}/4 ({accuracy}%)")
+        
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_network = nn
     
-    def solve_sum_task(self, task_text):
-        """Решает задачи на суммирование"""
-        # Извлекаем числа из задачи
-        numbers = re.findall(r'\d+', task_text)
-        if numbers:
-            nums = [int(n) for n in numbers]
-            
-            # РЕШАЕМ ЧЕРЕЗ ЦИКЛ FOR
-            total = 0
-            for num in nums:
-                total += num
-            
-            # ИЛИ через while (для демонстрации)
-            # i = 0
-            # total = 0
-            # while i < len(nums):
-            #     total += nums[i]
-            #     i += 1
-            
-            return f"Решение: сумма чисел {nums} = {total}\nКод:\nresult = 0\nfor num in {nums}:\n    result += num\nprint(result)  # {total}"
-        return "Решение: нужны числа для суммирования"
+    # Показываем лучшую сеть
+    if best_network:
+        print(f"\n🏆 ЛУЧШАЯ СЕТЬ (точность {best_accuracy}%):")
+        for (x1, x2), target in xor_data:
+            proba = best_network.predict_proba(x1, x2)
+            pred = best_network.predict(x1, x2)
+            print(f"  {x1} XOR {x2} = {pred}  (вероятность: {proba:.4f})")
+
+# ==================== ВИЗУАЛИЗАЦИЯ РЕШЕНИЙ ====================
+def visualize_solution(nn):
+    """
+    Визуализация того, как нейросеть разделяет пространство
+    """
+    print("\n" + "="*60)
+    print("ВИЗУАЛИЗАЦИЯ РАБОТЫ НЕЙРОСЕТИ")
+    print("="*60)
+    print("\nКарта решений (█ = 1, ░ = 0):")
+    print("   x2 →")
+    print(" x1↓")
     
-    def solve_count_task(self, task_text):
-        """Решает задачи на подсчёт"""
-        numbers = re.findall(r'\d+', task_text)
-        if 'чёт' in task_text.lower() or 'нечёт' in task_text.lower():
-            nums = [int(n) for n in numbers] if numbers else [1,2,3,4,5,6,7,8,9,10]
-            
-            # РЕШАЕМ ЧЕРЕЗ ЦИКЛ WHILE
-            count = 0
-            i = 0
-            while i < len(nums):
-                if nums[i] % 2 == 0:  # чётные
-                    count += 1
-                i += 1
-            
-            return f"Решение: количество чётных чисел = {count}\nКод:\nnumbers = {nums}\ncount = 0\ni = 0\nwhile i < len(numbers):\n    if numbers[i] % 2 == 0:\n        count += 1\n    i += 1\nprint(count)  # {count}"
-        return "Решение: задача на подсчёт (нужно уточнить условие)"
+    for x1 in [0, 0.25, 0.5, 0.75, 1]:
+        row = []
+        for x2 in [0, 0.25, 0.5, 0.75, 1]:
+            proba = nn.predict_proba(x1, x2)
+            row.append("█" if proba > 0.5 else "░")
+        print(f" {x1:.2f}  " + " ".join(row))
     
-    def solve_max_min_task(self, task_text):
-        """Решает задачи на поиск максимума/минимума"""
-        numbers = re.findall(r'\d+', task_text)
-        if numbers:
-            nums = [int(n) for n in numbers]
-            
-            # РЕШАЕМ ЧЕРЕЗ ЦИКЛ FOR
-            if 'максим' in task_text.lower():
-                max_val = nums[0]
-                for num in nums:
-                    if num > max_val:
-                        max_val = num
-                return f"Решение: максимум = {max_val}\nКод:\nnumbers = {nums}\nmax_val = numbers[0]\nfor num in numbers:\n    if num > max_val:\n        max_val = num\nprint(max_val)  # {max_val}"
+    print("\nЛегенда: █ = предсказано 1, ░ = предсказано 0")
+
+# ==================== ИНТЕРАКТИВНЫЙ РЕЖИМ ====================
+def interactive_mode(nn):
+    """
+    Интерактивный режим: пользователь вводит значения
+    """
+    print("\n" + "="*60)
+    print("ИНТЕРАКТИВНЫЙ РЕЖИМ")
+    print("="*60)
+    print("Введите два числа (0 или 1) для XOR")
+    print("Или 'выход' для завершения\n")
+    
+    while True:
+        user_input = input("Введите x1 x2: ").strip()
+        if user_input.lower() in ['выход', 'exit', 'quit', 'q']:
+            break
+        
+        try:
+            parts = user_input.split()
+            if len(parts) >= 2:
+                x1 = float(parts[0])
+                x2 = float(parts[1])
+                
+                proba = nn.predict_proba(x1, x2)
+                pred = nn.predict(x1, x2)
+                
+                print(f"{x1} XOR {x2} = {pred} (вероятность: {proba:.4f})")
+                print(f"{'✅' if pred == (int(x1)^int(x2)) else '⚠️'} {'Правильно' if pred == (int(x1)^int(x2)) else 'Неправильно'}")
             else:
-                min_val = nums[0]
-                for num in nums:
-                    if num < min_val:
-                        min_val = num
-                return f"Решение: минимум = {min_val}\nКод:\nnumbers = {nums}\nmin_val = numbers[0]\nfor num in numbers:\n    if num < min_val:\n        min_val = num\nprint(min_val)  # {min_val}"
-        return "Решение: нужен список чисел"
+                print("Введите два числа через пробел")
+        except ValueError:
+            print("Ошибка: введите числа")
+
+# ==================== ГЛАВНАЯ ФУНКЦИЯ ====================
+def main():
+    print("="*60)
+    print("    НЕЙРОСЕТЬ ДЛЯ РЕШЕНИЯ ЗАДАЧИ XOR")
+    print("    (с использованием циклов for и while)")
+    print("="*60)
     
-    def solve_pattern_task(self, task_text):
-        """Решает задачи на вывод узоров/паттернов"""
-        numbers = re.findall(r'\d+', task_text)
-        n = int(numbers[0]) if numbers else 5
-        
-        # РЕШАЕМ ЧЕРЕЗ ВЛОЖЕННЫЕ ЦИКЛЫ
-        pattern = []
-        for i in range(1, n + 1):
-            row = []
-            for j in range(1, i + 1):
-                row.append(str(j))
-            pattern.append(' '.join(row))
-        
-        result = '\n'.join(pattern)
-        return f"Решение: треугольник из чисел\nКод:\nn = {n}\nfor i in range(1, n+1):\n    for j in range(1, i+1):\n        print(j, end=' ')\n    print()\n\nРезультат:\n{result}"
+    # Создаём и обучаем основную нейросеть
+    print("\n🤖 СОЗДАНИЕ НЕЙРОСЕТИ...")
+    nn = NeuralNetworkXOR(hidden_neurons=4, learning_rate=0.8)
     
-    def solve_filter_task(self, task_text):
-        """Решает задачи на фильтрацию"""
-        numbers = re.findall(r'\d+', task_text)
-        if numbers:
-            nums = [int(n) for n in numbers]
-            
-            # РЕШАЕМ ЧЕРЕЗ ЦИКЛ WHILE С УСЛОВИЕМ
-            filtered = []
-            i = 0
-            while i < len(nums):
-                if nums[i] > 5:  # фильтруем числа больше 5
-                    filtered.append(nums[i])
-                i += 1
-            
-            return f"Решение: числа > 5 из {nums} = {filtered}\nКод:\nnumbers = {nums}\nresult = []\ni = 0\nwhile i < len(numbers):\n    if numbers[i] > 5:\n        result.append(numbers[i])\n    i += 1\nprint(result)  # {filtered}"
-        return "Решение: нужен список чисел для фильтрации"
+    print("\n📚 НАЧАЛО ОБУЧЕНИЯ...")
+    xor_data = [([0,0], 0), ([0,1], 1), ([1,0], 1), ([1,1], 0)]
+    nn.train(xor_data, epochs=20000, verbose=True)
     
-    def solve_generic(self, task_text):
-        """Универсальное решение для простых задач"""
-        numbers = re.findall(r'\d+', task_text)
-        if numbers:
-            nums = [int(n) for n in numbers]
-            
-            # Базовый цикл for
-            result = []
-            for num in nums:
-                result.append(num * 2)
-            
-            return f"Решение: каждый элемент умножен на 2\nКод:\nnumbers = {nums}\nresult = []\nfor num in numbers:\n    result.append(num * 2)\nprint(result)  # {result}"
-        return "Решение: пример цикла\nКод:\nfor i in range(5):\n    print(f'Итерация {i}')"
-
-# ============ ИСПОЛЬЗОВАНИЕ ============
-
-# Создаём нейросеть-решатель задач
-solver = CycleTaskSolver()
-
-# Задачи для решения
-tasks = [
-    "Найди сумму чисел 5, 10, 15, 20",
-    "Подсчитай количество чётных чисел в списке 1 2 3 4 5 6",
-    "Найди максимальное число в массиве 3 7 2 9 1",
-    "Выведи треугольник из чисел до 4",
-    "Оставь только числа больше 5 из 2 8 3 9 1 7"
-]
-
-print("=" * 60)
-print("НЕЙРОСЕТЬ РЕШАЕТ ЗАДАЧИ НА ЦИКЛЫ")
-print("=" * 60)
-
-for task in tasks:
-    print(f"\n📌 ЗАДАЧА: {task}")
-    print("-" * 40)
-    solution = solver.generate_solution(task)
-    print(solution)
-    print("-" * 40)
-
-# Интерактивный режим
-print("\n\n🎮 ИНТЕРАКТИВНЫЙ РЕЖИМ")
-print("Введите свою задачу на циклы (или 'выход' для завершения):")
-
-while True:
-    user_task = input("\nВаша задача: ")
-    if user_task.lower() in ['выход', 'exit', 'quit']:
-        print("До свидания!")
-        break
+    # Проверка на обучающих данных
+    print("\n✅ ПРОВЕРКА НА ОБУЧАЮЩИХ ДАННЫХ:")
+    correct = 0
+    for (x1, x2), target in xor_data:
+        proba = nn.predict_proba(x1, x2)
+        pred = nn.predict(x1, x2)
+        correct += (pred == target)
+        status = "✅" if pred == target else "❌"
+        print(f"{status} {x1} XOR {x2} = {pred}  (вероятность: {proba:.4f}, должно: {target})")
     
-    solution = solver.generate_solution(user_task)
-    print("\n🤖 НЕЙРОСЕТЬ РЕШИЛА:")
-    print(solution)
+    print(f"\n📊 ТОЧНОСТЬ: {correct}/4 ({correct*25}%)")
+    
+    # Визуализация
+    visualize_solution(nn)
+    
+    # Запускаем упрощённую версию
+    simple_xor_network()
+    
+    # Расширенное тестирование
+    extended_test()
+    
+    # Интерактивный режим
+    interactive_mode(nn)
+    
+    print("\n" + "="*60)
+    print("СПАСИБО ЗА ИСПОЛЬЗОВАНИЕ НЕЙРОСЕТИ!")
+    print("="*60)
+
+# ==================== ЗАПУСК ====================
+if __name__ == "__main__":
+    main()
