@@ -1,18 +1,18 @@
-# ==================== ОДНОСТРОЧНЫЙ РЕЖИМ ====================
-if __name__ == '__main__':
-    import sys
-    
-    # Если передан аргумент командной строки
-    if len(sys.argv) > 1:
-        task = sys.argv[1]
-        print(f"🤖 Задача: {task}")
-        
-        # Создаём интерфейс (модель подгрузится сама)
-        interface = ImprovedNeuralInterface()
-        
-        # Решаем задачу
-        solution = interface.solve_task(task)
-        
-    else:
-        print("❌ Ошибка: не указана задача")
-        print("Использование: python neiroset.py 'твоя задача'")
+import requests
+
+# Первая строка - промт (как нужно решать)
+prompt = input()
+# Вторая строка - задача
+task = input()
+
+# Формируем полный запрос
+full_prompt = f"{prompt} {task}"
+
+url = "https://text.pollinations.ai/"
+response = requests.get(f"{url}{full_prompt}")
+
+code = response.text
+print("\n=== Код ===\n")
+print(code)
+print("\n=== Результат ===\n")
+exec(code)
