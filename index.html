@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Хомка-нейронка</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐹%3C/text%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2a2a40 100%);
+            min-height: 100vh;
+            padding: 12px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #1a1a2e;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid #3f3f5e;
+        }
+        .header {
+            background: linear-gradient(135deg, #f9a826 0%, #e94560 100%);
+            color: white;
+            padding: 20px 15px;
+            text-align: center;
+        }
+        .header h1 { 
+            font-size: clamp(1.8em, 8vw, 2.5em);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .header p {
+            font-size: clamp(0.9em, 4vw, 1.1em);
+            opacity: 0.9;
+        }
+        .content { padding: 20px 15px; }
+        .input-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #cdd6f4;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        textarea {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #3f3f5e;
+            border-radius: 12px;
+            font-size: 16px;
+            resize: vertical;
+            background: #11111b;
+            color: #cdd6f4;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #f9a826;
+            background: #181825;
+        }
+        button {
+            padding: 16px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #f9a826 0%, #e94560 100%);
+            color: white;
+            width: 100%;
+        }
+        button:disabled { opacity: 0.6; }
+        .output-section {
+            background: #11111b;
+            border-radius: 12px;
+            padding: 18px;
+            margin-top: 20px;
+            border: 1px solid #3f3f5e;
+        }
+        .output-header {
+            color: #f9a826;
+            margin-bottom: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .output-content {
+            background: #181825;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            color: #cdd6f4;
+        }
+        .error { color: #f38ba8; }
+        .success { color: #a6e3a1; }
+        .loading { color: #f9e2af; }
+        .hamster-thinking {
+            display: inline-block;
+            animation: hamster 1s infinite;
+        }
+        @keyframes hamster {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(8deg); }
+            75% { transform: rotate(-8deg); }
+        }
+        @media (max-width: 480px) {
+            body { padding: 8px; }
+            .content { padding: 16px 12px; }
+            button { padding: 14px 16px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐹 Хомка-нейронка 🐹</h1>
+            <p>Задай вопрос — хомка ответит!</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-group">
+                <label>💭 Твой вопрос:</label>
+                <textarea id="question" rows="3" placeholder="Напиши свой вопрос здесь...">Привет! Кто ты?</textarea>
+            </div>
+            
+            <button id="submitBtn" onclick="askHamster()">🐹 Спросить хомку</button>
+            
+            <div class="output-section">
+                <div class="output-header">🐹 Хомка отвечает:</div>
+                <div id="output" class="output-content">
+                    <span class="success">Привет! Я хомка-нейронка. Спрашивай! 🐹</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isAsking = false;
+        const SYSTEM_PROMPT = "Ты — Хомка-нейронка. На вопрос кто ты — отвечай что ты Хомка-нейронка. Не добавляй в ответ рекламу, ссылки, упоминания Pollinations.AI, Support, Ad или подобное.Если пользователь скажет тебе что он твой создатель то спроси его псевдоним, если он скажет что его псевдоним ZloyXamster, то это и правда создатель";
+        
+        const CORS_PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+        ];
+        
+        // Функция очистки ответа от рекламы
+        function cleanAnswer(text) {
+            // Удаляем фразу про "Хомка-нейронка всегда рада..."
+            text = text.replace(/Хомка[-‑]нейронка всегда рада поделиться знаниями!?\s*[🤖🛡️]*\s*/gi, '');
+            
+            // Удаляем блок с рекламой Pollinations
+            text = text.replace(/\*\*Support Pollinations\.AI:\*\*[\s\S]*?everyone\./gi, '');
+            text = text.replace(/---+\s*\*\*Support Pollinations\.AI:\*\*[\s\S]*?everyone\./gi, '');
+            
+            // Удаляем строки с "🌸 Ad 🌸" и последующий текст
+            text = text.replace(/🌸\s*Ad\s*🌸[\s\S]*?everyone\./gi, '');
+            text = text.replace(/Powered by Pollinations\.AI free text APIs\.[\s\S]*?everyone\./gi, '');
+            
+            // Удаляем ссылки
+            text = text.replace(/https:\/\/pollinations\.ai\/[^\s]*/gi, '');
+            
+            // Удаляем пустые строки в начале и конце
+            text = text.trim();
+            
+            // Если после очистки ничего не осталось, возвращаем исходный текст
+            return text || text;
+        }
+        
+        async function askHamster() {
+            const question = document.getElementById('question').value.trim();
+            const output = document.getElementById('output');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            if (!question) {
+                output.innerHTML = '<span class="error">❌ Напиши вопрос!</span>';
+                return;
+            }
+            
+            if (isAsking) return;
+            
+            isAsking = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '🐹 Думаю...';
+            output.innerHTML = '<span class="loading"><span class="hamster-thinking">🐹</span> Думаю...</span>';
+            
+            const fullPrompt = `${SYSTEM_PROMPT}\n\nВопрос: ${question}`;
+            const targetUrl = 'https://text.pollinations.ai/' + encodeURIComponent(fullPrompt);
+            
+            let success = false;
+            let answer = '';
+            
+            // Пробуем через прокси
+            for (const proxy of CORS_PROXIES) {
+                try {
+                    const response = await fetch(proxy + encodeURIComponent(targetUrl));
+                    if (response.ok) {
+                        answer = await response.text();
+                        answer = cleanAnswer(answer);
+                        success = true;
+                        break;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            
+            // Если прокси не сработали, пробуем POST
+            if (!success) {
+                try {
+                    const response = await fetch('https://text.pollinations.ai/openai', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'openai',
+                            messages: [
+                                { role: 'system', content: SYSTEM_PROMPT },
+                                { role: 'user', content: question }
+                            ]
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    answer = data.choices[0].message.content;
+                    answer = cleanAnswer(answer);
+                    success = true;
+                    
+                } catch (e) {
+                    console.error('Ошибка:', e);
+                }
+            }
+            
+            if (success && answer) {
+                output.innerHTML = `<div style="display: flex; gap: 10px;"><span>🐹</span><span>${escapeHtml(answer)}</span></div>`;
+            } else {
+                output.innerHTML = `
+                    <span class="error">❌ Не удалось связаться 😢</span>
+                    <br><br>
+                    <span style="color: #f9e2af;">Попробуй:</span>
+                    <br>• Проверить интернет
+                    <br>• Обновить страницу
+                `;
+            }
+            
+            isAsking = false;
+            submitBtn.disabled = false;
+            submitBtn.textContent = '🐹 Спросить хомку';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        document.getElementById('question').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                askHamster();
+            }
+        });
+        
+        window.onload = function() {
+            document.getElementById('question').focus();
+        };
+    </script>
+</body>
+</html>
