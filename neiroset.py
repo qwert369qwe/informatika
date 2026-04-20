@@ -16,3 +16,4 @@ print("\n=== Код ===\n")
 print(code)
 print("\n=== Результат ===\n")
 exec(code)
+# https://xomka-neironka.ucoz.net/index.html
